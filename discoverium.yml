@@ -1,0 +1,8 @@
+app:
+  name: NovaStream
+  authors: rinford09
+  category: entertainment
+  description: Android app for streaming and downloading media.
+  icon: https://raw.githubusercontent.com/rinford09/NovaStream/main/app/src/main/res/mipmap-xxxhdpi/ic_launcher_round.png
+  releases:
+    url: https://github.com/rinford09/NovaStream/releases
