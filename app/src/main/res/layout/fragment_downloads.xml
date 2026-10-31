@@ -5,14 +5,14 @@
     android:id="@+id/download_root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="?attr/primaryGrayBackground"
+    android:background="?attr/primaryBlackBackground"
     android:orientation="vertical"
     tools:context=".ui.download.DownloadFragment">
 
     <com.google.android.material.appbar.AppBarLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:background="?attr/primaryGrayBackground">
+        android:background="?attr/primaryBlackBackground">
         <!--
         For Scroll add to LinearLayout
         app:layout_scrollFlags="scroll|enterAlways"
@@ -22,7 +22,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
-            android:background="?attr/primaryGrayBackground"
+            android:background="?attr/primaryBlackBackground"
             android:padding="8dp"
             android:visibility="gone">
 
@@ -320,7 +320,7 @@
             android:layout_width="match_parent"
             android:layout_height="50dp"
             android:layout_gravity="bottom"
-            android:background="?attr/primaryGrayBackground"
+            android:background="?attr/boxItemBackground"
             android:orientation="vertical">
 
             <ImageView
@@ -328,7 +328,8 @@
                 android:layout_width="20dp"
                 android:layout_height="25dp"
                 android:layout_gravity="center"
-                android:src="@drawable/round_keyboard_arrow_up_24" />
+                android:src="@drawable/round_keyboard_arrow_up_24"
+                app:tint="?attr/colorPrimary" />
 
             <TextView
                 android:id="@+id/download_queue_text"
@@ -347,6 +348,8 @@
             android:layout_gravity="center"
             android:layout_marginBottom="30dp"
             android:text="@string/downloads_empty"
+            android:textColor="?attr/grayTextColor"
+            android:textSize="16sp"
             android:gravity="center"
             android:visibility="gone"
             tools:visibility="visible" />

@@ -34,20 +34,176 @@ jobs:
     - name: Setup Gradle
       uses: gradle/actions/setup-gradle@v4
 
-    - name: Run Gradle
+    - name: Validate and Decode Release Keystore
+      env:
+        KS_B64: ${{ secrets.NOVASTREAM_KEYSTORE_BASE64 }}
+        KS_PWD: ${{ secrets.NOVASTREAM_KEYSTORE_PASSWORD }}
+        K_ALIAS: ${{ secrets.NOVASTREAM_KEY_ALIAS }}
+        K_PWD: ${{ secrets.NOVASTREAM_KEY_PASSWORD }}
+      run: |
+        if [ -z "$KS_B64" ] || [ -z "$KS_PWD" ] || [ -z "$K_ALIAS" ] || [ -z "$K_PWD" ]; then
+          echo "::error::Missing one or more required NovaStream release signing secrets."
+          exit 1
+        fi
+        mkdir -p "${RUNNER_TEMP}/keystore"
+        echo "$KS_B64" | base64 -d > "${RUNNER_TEMP}/keystore/novastream-release.jks"
+        keytool -list -v -keystore "${RUNNER_TEMP}/keystore/novastream-release.jks" -storepass "$KS_PWD" -alias "$K_ALIAS" > /dev/null
+
+    - name: Compile Prerelease Release APK
+      env:
+        NOVASTREAM_KEYSTORE_PATH: ${{ runner.temp }}/keystore/novastream-release.jks
+        NOVASTREAM_KEYSTORE_PASSWORD: ${{ secrets.NOVASTREAM_KEYSTORE_PASSWORD }}
+        NOVASTREAM_KEY_ALIAS: ${{ secrets.NOVASTREAM_KEY_ALIAS }}
+        NOVASTREAM_KEY_PASSWORD: ${{ secrets.NOVASTREAM_KEY_PASSWORD }}
       run: |
         ./gradlew assemblePrereleaseRelease
-        cp app/build/outputs/apk/prerelease/release/*.apk app/build/outputs/apk/prerelease/release/novastream-prerelease.apk
 
-    - name: Create pre-release
-      uses: softprops/action-gh-release@v2
-      with:
-        token: "${{ secrets.GITHUB_TOKEN }}"
-        tag_name: "pre-release"
-        name: "NovaStream Pre-release"
-        prerelease: true
-        draft: false
-        generate_release_notes: false
-        body: "Automated NovaStream build with independent identity and custom integrations."
-        files: |
-          app/build/outputs/apk/prerelease/release/novastream-prerelease.apk
+    - name: Select, Verify, and Stage Prerelease APK
+      run: |
+        shopt -s nullglob
+        CANDIDATES=(app/build/outputs/apk/prerelease/release/*.apk)
+        COUNT=${#CANDIDATES[@]}
+
+        if [ "$COUNT" -eq 0 ]; then
+          echo "::error::Zero APK candidates found in app/build/outputs/apk/prerelease/release/!"
+          exit 1
+        fi
+
+        if [ "$COUNT" -gt 1 ]; then
+          echo "::error::Multiple APK candidates found ($COUNT). Expected exactly 1: ${CANDIDATES[*]}"
+          exit 1
+        fi
+
+        SRC_APK="${CANDIDATES[0]}"
+        echo "Selected single APK candidate: $SRC_APK"
+
+        BUILD_TOOLS_DIR=$(ls -d $ANDROID_HOME/build-tools/* | sort -V | tail -1)
+
+        # 1. Verify APK signature before staging
+        echo "--> Verifying APK signature with apksigner..."
+        "$BUILD_TOOLS_DIR/apksigner" verify --print-certs -v "$SRC_APK"
+
+        # 2. Verify Application ID and badging
+        echo "--> Verifying Application ID and Badging with aapt2..."
+        BADGING=$("$BUILD_TOOLS_DIR/aapt2" dump badging "$SRC_APK")
+        PACKAGE_LINE=$(echo "$BADGING" | grep "^package: name=")
+        echo "$PACKAGE_LINE"
+
+        if ! echo "$PACKAGE_LINE" | grep -q "package: name='com.rindou.novastream.prerelease'"; then
+          echo "::error::Package ID mismatch! Expected com.rindou.novastream.prerelease"
+          exit 1
+        fi
+
+        if ! echo "$PACKAGE_LINE" | grep -q "versionName='.*-PRE'"; then
+          echo "::error::Version name does not have expected -PRE prerelease suffix!"
+          exit 1
+        fi
+
+        # 3. Stage verified APK to dedicated distribution folder
+        mkdir -p "${RUNNER_TEMP}/dist"
+        cp "$SRC_APK" "${RUNNER_TEMP}/dist/novastream-prerelease.apk"
+        echo "Verified APK successfully staged to ${RUNNER_TEMP}/dist/novastream-prerelease.apk"
+
+    - name: Publish Prerelease (Upload-First, Verify-Second, Cleanup-Last)
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        REPO: ${{ github.repository }}
+      run: |
+        STAGED_APK="${RUNNER_TEMP}/dist/novastream-prerelease.apk"
+        if [ ! -f "$STAGED_APK" ]; then
+          echo "::error::Staged APK not found: $STAGED_APK"
+          exit 1
+        fi
+        LOCAL_SIZE=$(stat -c%s "$STAGED_APK")
+
+        # 1. Fetch or create pre-release release
+        echo "--> Fetching pre-release release from GitHub..."
+        RELEASE_JSON=$(curl -s -H "Authorization: Bearer $GH_TOKEN" \
+          -H "Accept: application/vnd.github+json" \
+          "https://api.github.com/repos/${REPO}/releases/tags/pre-release" || echo "{}")
+        
+        RELEASE_ID=$(echo "$RELEASE_JSON" | jq -r '.id // empty')
+        if [ -z "$RELEASE_ID" ]; then
+          echo "Creating pre-release release..."
+          CREATE_JSON=$(curl -s -X POST \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/${REPO}/releases" \
+            -d '{"tag_name":"pre-release","name":"NovaStream Pre-release","prerelease":true,"draft":false,"body":"Automated NovaStream prerelease build."}')
+          RELEASE_ID=$(echo "$CREATE_JSON" | jq -r '.id // empty')
+          if [ -z "$RELEASE_ID" ]; then
+            echo "::error::Failed to create release: $CREATE_JSON"
+            exit 1
+          fi
+          RELEASE_JSON="$CREATE_JSON"
+        fi
+        echo "Using Release ID: $RELEASE_ID"
+
+        # 2. Prune any leftover incoming staging asset from previous crashed runs (never touch working APK)
+        STALE_INCOMING_ID=$(echo "$RELEASE_JSON" | jq -r '.assets[] | select(.name == "novastream-prerelease-incoming.apk") | .id // empty')
+        if [ -n "$STALE_INCOMING_ID" ]; then
+          echo "Pruning stale incoming asset ID: $STALE_INCOMING_ID..."
+          curl -s -X DELETE -H "Authorization: Bearer $GH_TOKEN" \
+            "https://api.github.com/repos/${REPO}/releases/assets/${STALE_INCOMING_ID}"
+        fi
+
+        # 3. STAGE 1: UPLOAD FIRST
+        echo "--> [Step 1: Upload First] Uploading incoming APK..."
+        UPLOAD_RESP=$(curl -s -X POST \
+          -H "Authorization: Bearer $GH_TOKEN" \
+          -H "Content-Type: application/vnd.android.package-archive" \
+          --data-binary @"$STAGED_APK" \
+          "https://uploads.github.com/repos/${REPO}/releases/${RELEASE_ID}/assets?name=novastream-prerelease-incoming.apk")
+
+        NEW_ASSET_ID=$(echo "$UPLOAD_RESP" | jq -r '.id // empty')
+        if [ -z "$NEW_ASSET_ID" ]; then
+          echo "::error::Upload failed! Existing working APK was NOT modified. Response: $UPLOAD_RESP"
+          exit 1
+        fi
+        echo "Upload succeeded. New asset ID: $NEW_ASSET_ID"
+
+        # 4. STAGE 2: VERIFY SECOND
+        echo "--> [Step 2: Verify Second] Verifying uploaded asset on GitHub..."
+        CHECK_RESP=$(curl -s -H "Authorization: Bearer $GH_TOKEN" \
+          -H "Accept: application/vnd.github+json" \
+          "https://api.github.com/repos/${REPO}/releases/assets/${NEW_ASSET_ID}")
+        
+        REMOTE_SIZE=$(echo "$CHECK_RESP" | jq -r '.size // 0')
+        if [ "$REMOTE_SIZE" -ne "$LOCAL_SIZE" ]; then
+          echo "::error::Size verification failed! Remote: $REMOTE_SIZE, Local: $LOCAL_SIZE. Existing working APK was NOT modified."
+          curl -s -X DELETE -H "Authorization: Bearer $GH_TOKEN" \
+            "https://api.github.com/repos/${REPO}/releases/assets/${NEW_ASSET_ID}"
+          exit 1
+        fi
+        echo "Verification passed. Remote size ($REMOTE_SIZE bytes) matches local file."
+
+        # 5. STAGE 3: CLEANUP LAST
+        echo "--> [Step 3: Cleanup Last] Swapping assets atomically..."
+        # Locate previous working APK (if present)
+        OLD_ASSET_ID=$(echo "$RELEASE_JSON" | jq -r '.assets[] | select(.name == "novastream-prerelease.apk") | .id // empty')
+        if [ -n "$OLD_ASSET_ID" ] && [ "$OLD_ASSET_ID" != "$NEW_ASSET_ID" ]; then
+          echo "Deleting previous working APK asset (ID: $OLD_ASSET_ID)..."
+          curl -s -X DELETE -H "Authorization: Bearer $GH_TOKEN" \
+            "https://api.github.com/repos/${REPO}/releases/assets/${OLD_ASSET_ID}"
+        fi
+
+        # Rename verified incoming asset to novastream-prerelease.apk
+        echo "Renaming asset $NEW_ASSET_ID to novastream-prerelease.apk..."
+        RENAME_RESP=$(curl -s -X PATCH \
+          -H "Authorization: Bearer $GH_TOKEN" \
+          -H "Accept: application/vnd.github+json" \
+          "https://api.github.com/repos/${REPO}/releases/assets/${NEW_ASSET_ID}" \
+          -d '{"name":"novastream-prerelease.apk"}')
+
+        FINAL_NAME=$(echo "$RENAME_RESP" | jq -r '.name // empty')
+        if [ "$FINAL_NAME" != "novastream-prerelease.apk" ]; then
+          echo "::error::Asset rename failed! Response: $RENAME_RESP"
+          exit 1
+        fi
+        echo "Release asset replacement completed successfully with zero downtime or loss."
+
+    - name: Cleanup Keystore and Staging
+      if: always()
+      run: |
+        rm -rf "${RUNNER_TEMP}/keystore"
+        rm -rf "${RUNNER_TEMP}/dist"

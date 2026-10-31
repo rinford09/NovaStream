@@ -1,4 +1,6 @@
 import com.android.build.gradle.internal.cxx.configure.gradleLocalProperties
+import java.io.File
+import java.util.Properties
 import org.jetbrains.dokka.gradle.engine.parameters.KotlinPlatform
 import org.jetbrains.dokka.gradle.engine.parameters.VisibilityModifier
 import org.jetbrains.kotlin.gradle.dsl.JvmDefaultMode
@@ -61,6 +63,49 @@ val generateGitHash = tasks.register<GenerateGitHashTask>("generateGitHash") {
     outputDir.set(layout.buildDirectory.dir("generated/git"))
 }
 
+val localProperties = gradleLocalProperties(rootDir, project.providers)
+val signingProperties = Properties().apply {
+    val f = rootProject.file("signing.properties")
+    if (f.exists()) {
+        f.inputStream().use { load(it) }
+    }
+}
+
+val keystorePath: String? = System.getenv("NOVASTREAM_KEYSTORE_PATH")
+    ?: signingProperties.getProperty("NOVASTREAM_KEYSTORE_PATH")
+    ?: localProperties.getProperty("novastream.keystore.path")
+    ?: localProperties.getProperty("NOVASTREAM_KEYSTORE_PATH")
+    ?: System.getenv("RUNNER_TEMP")?.let { "$it/keystore/novastream-release.jks" }
+
+val storePasswordVal: String? = System.getenv("NOVASTREAM_KEYSTORE_PASSWORD")
+    ?: System.getenv("SIGNING_STORE_PASSWORD")
+    ?: signingProperties.getProperty("NOVASTREAM_KEYSTORE_PASSWORD")
+    ?: localProperties.getProperty("novastream.keystore.password")
+    ?: localProperties.getProperty("NOVASTREAM_KEYSTORE_PASSWORD")
+
+val keyAliasVal: String? = System.getenv("NOVASTREAM_KEY_ALIAS")
+    ?: System.getenv("SIGNING_KEY_ALIAS")
+    ?: signingProperties.getProperty("NOVASTREAM_KEY_ALIAS")
+    ?: localProperties.getProperty("novastream.key.alias")
+    ?: localProperties.getProperty("NOVASTREAM_KEY_ALIAS")
+
+val keyPasswordVal: String? = System.getenv("NOVASTREAM_KEY_PASSWORD")
+    ?: System.getenv("SIGNING_KEY_PASSWORD")
+    ?: signingProperties.getProperty("NOVASTREAM_KEY_PASSWORD")
+    ?: localProperties.getProperty("novastream.key.password")
+    ?: localProperties.getProperty("NOVASTREAM_KEY_PASSWORD")
+
+val resolvedKeystoreFile: File? = keystorePath?.let { path ->
+    val f = File(path)
+    if (f.isAbsolute) f else rootProject.file(path)
+}
+
+val hasReleaseSigningConfig: Boolean = resolvedKeystoreFile != null &&
+    resolvedKeystoreFile.exists() &&
+    !storePasswordVal.isNullOrBlank() &&
+    !keyAliasVal.isNullOrBlank() &&
+    !keyPasswordVal.isNullOrBlank()
+
 android {
     @Suppress("UnstableApiUsage")
     testOptions {
@@ -85,17 +130,12 @@ android {
     }
 
     signingConfigs {
-        // We just use SIGNING_KEY_ALIAS here since it won't change
-        // so won't kill the configuration cache.
-        if (System.getenv("SIGNING_KEY_ALIAS") != null) {
-            create("prerelease") {
-                val tmpFilePath = System.getProperty("user.home") + "/work/_temp/keystore/"
-                val prereleaseStoreFile: File? = File(tmpFilePath).listFiles()?.first()
-
-                storeFile = prereleaseStoreFile?.let { file(it) }
-                storePassword = System.getenv("SIGNING_STORE_PASSWORD")
-                keyAlias = System.getenv("SIGNING_KEY_ALIAS")
-                keyPassword = System.getenv("SIGNING_KEY_PASSWORD")
+        create("release") {
+            if (hasReleaseSigningConfig) {
+                storeFile = resolvedKeystoreFile
+                storePassword = storePasswordVal
+                keyAlias = keyAliasVal
+                keyPassword = keyPasswordVal
             }
         }
     }
@@ -110,9 +150,6 @@ android {
         versionName = libs.versions.versionName.get()
 
         manifestPlaceholders["target_sdk_version"] = libs.versions.targetSdk.get()
-
-        // Reads local.properties
-        val localProperties = gradleLocalProperties(rootDir, project.providers)
 
         buildConfigField(
             "long",
@@ -147,7 +184,7 @@ android {
             isDebuggable = false
             isMinifyEnabled = false
             isShrinkResources = false
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.getByName("release")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -156,6 +193,7 @@ android {
         debug {
             isDebuggable = true
             applicationIdSuffix = ".debug"
+            signingConfig = signingConfigs.getByName("debug")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -171,11 +209,6 @@ android {
         create("prerelease") {
             dimension = "state"
             applicationIdSuffix = ".prerelease"
-            if (signingConfigs.names.contains("prerelease")) {
-                signingConfig = signingConfigs.getByName("prerelease")
-            } else {
-                signingConfig = signingConfigs.getByName("debug")
-            }
             versionNameSuffix = "-PRE"
             versionCode = (System.currentTimeMillis() / 60000).toInt()
         }
@@ -356,6 +389,53 @@ dokka {
                 localDirectory = file("..")
                 remoteUrl("https://github.com/rinford09/NovaStream/tree/main")
                 remoteLineSuffix = "#L"
+            }
+        }
+    }
+}
+
+if (!hasReleaseSigningConfig) {
+    val missingDetails = mutableListOf<String>()
+    if (resolvedKeystoreFile == null || !resolvedKeystoreFile.exists()) {
+        missingDetails.add("Keystore file not found at: '${resolvedKeystoreFile?.absolutePath ?: "NOVASTREAM_KEYSTORE_PATH not set"}'")
+    }
+    if (storePasswordVal.isNullOrBlank()) {
+        missingDetails.add("Keystore password is missing (NOVASTREAM_KEYSTORE_PASSWORD)")
+    }
+    if (keyAliasVal.isNullOrBlank()) {
+        missingDetails.add("Key alias is missing (NOVASTREAM_KEY_ALIAS)")
+    }
+    if (keyPasswordVal.isNullOrBlank()) {
+        missingDetails.add("Key password is missing (NOVASTREAM_KEY_PASSWORD)")
+    }
+
+    val releaseSigningErrorMessage = """
+        ================================================================================
+        [NOVASTREAM RELEASE SIGNING CONFIGURATION ERROR]
+        Release build cannot be compiled without valid Release signing credentials.
+        Automatic/silent fallback to Android Debug signing is strictly prohibited for Release builds.
+
+        Missing / Invalid parameters:
+        ${missingDetails.joinToString("\n") { "  * $it" }}
+
+        How to fix:
+        1. Provide environment variables:
+             NOVASTREAM_KEYSTORE_PATH=/path/to/novastream-release.jks
+             NOVASTREAM_KEYSTORE_PASSWORD=your_store_password
+             NOVASTREAM_KEY_ALIAS=novastream
+             NOVASTREAM_KEY_PASSWORD=your_key_password
+           OR configure them in a git-ignored 'signing.properties' or 'local.properties' file.
+
+        2. For local testing without release keys, build a Debug variant instead:
+             ./gradlew assemblePrereleaseDebug
+             ./gradlew assembleStableDebug
+        ================================================================================
+    """.trimIndent()
+
+    tasks.configureEach {
+        if ((name.startsWith("validateSigning") || name.startsWith("package")) && name.endsWith("Release")) {
+            doFirst {
+                throw GradleException(releaseSigningErrorMessage)
             }
         }
     }

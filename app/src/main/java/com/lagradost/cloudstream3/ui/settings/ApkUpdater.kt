@@ -29,7 +29,8 @@ import java.security.DigestException
 import java.security.MessageDigest
 
 object ApkUpdater : AppUpdater {
-    private const val APP_UPDATE_NAME = "CloudStream"
+    private const val APP_UPDATE_NAME = "NovaStream"
+    private const val LEGACY_UPDATE_NAME = "CloudStream"
     private const val APP_UPDATE_SUFFIX = "apk"
 
     @Throws
@@ -70,7 +71,7 @@ object ApkUpdater : AppUpdater {
     fun clearOldFiles(activity: Activity) {
         // Delete old files
         activity.cacheDir.listFiles()?.filter {
-            it.name.startsWith(APP_UPDATE_NAME) && it.extension == APP_UPDATE_SUFFIX
+            (it.name.startsWith(APP_UPDATE_NAME) || it.name.startsWith(LEGACY_UPDATE_NAME)) && it.extension == APP_UPDATE_SUFFIX
         }?.forEach {
             deleteFileOnExit(it)
         }

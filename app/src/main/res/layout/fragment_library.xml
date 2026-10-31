@@ -4,7 +4,7 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:id="@+id/library_root"
-    android:background="?attr/primaryGrayBackground"
+    android:background="?attr/primaryBlackBackground"
     android:layout_width="match_parent"
     android:layout_height="match_parent">
 
@@ -15,6 +15,8 @@
         android:layout_gravity="center"
         android:layout_margin="30dp"
         android:gravity="center"
+        android:textColor="?attr/grayTextColor"
+        android:textSize="16sp"
         android:visibility="gone"
         tools:visibility="visible" />
 
@@ -22,7 +24,7 @@
         android:id="@+id/search_bar"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:background="?attr/primaryGrayBackground">
+        android:background="?attr/primaryBlackBackground">
 
         <LinearLayout
             android:layout_width="match_parent"

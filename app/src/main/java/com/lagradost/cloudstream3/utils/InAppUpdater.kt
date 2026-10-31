@@ -189,12 +189,13 @@ object InAppUpdater {
     private suspend fun Activity.downloadUpdate(url: String): Boolean {
         try {
             Log.d(LOG_TAG, "Downloading update: $url")
-            val appUpdateName = "CloudStream"
+            val appUpdateName = "NovaStream"
+            val legacyUpdateName = "CloudStream"
             val appUpdateSuffix = "apk"
 
             // Delete all old updates
             this.cacheDir.listFiles()?.filter {
-                it.name.startsWith(appUpdateName) && it.extension == appUpdateSuffix
+                (it.name.startsWith(appUpdateName) || it.name.startsWith(legacyUpdateName)) && it.extension == appUpdateSuffix
             }?.forEach { deleteFileOnExit(it) }
 
             val downloadedFile = File.createTempFile(appUpdateName, ".$appUpdateSuffix")

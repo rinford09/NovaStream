@@ -64,11 +64,12 @@ class PackageInstallerService : Service() {
 
             // Delete all old updates
             ioSafe {
-                val appUpdateName = "CloudStream"
+                val appUpdateName = "NovaStream"
+                val legacyUpdateName = "CloudStream"
                 val appUpdateSuffix = "apk"
 
                 this@PackageInstallerService.cacheDir.listFiles()?.filter {
-                    it.name.startsWith(appUpdateName) && it.extension == appUpdateSuffix
+                    (it.name.startsWith(appUpdateName) || it.name.startsWith(legacyUpdateName)) && it.extension == appUpdateSuffix
                 }?.forEach {
                     deleteFileOnExit(it)
                 }

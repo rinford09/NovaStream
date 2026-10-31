@@ -1,61 +1,56 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="colorPrimary">#3d50fa</color>
+    <!-- NovaStream Cinematic Brand Colors -->
+    <color name="colorPrimary">#35D6F2</color> <!-- Electric Cyan -->
     <color name="colorPrimarySecond">@color/colorPrimary</color>
-    <color name="colorSearch">#303135</color> <!--#3444D1 @color/itemBackground-->
-    <color name="colorOngoing">#F53B66</color> <!--FF8181-->
-    <color name="colorPrimaryDark">#3700B3</color>
-    <color name="colorAccent">#3b65f5</color> <!-- 818fff-->
+    <color name="colorSearch">#182235</color> <!-- Elevated Surfaces -->
+    <color name="colorOngoing">#35D6F2</color> <!-- Electric Cyan -->
+    <color name="colorPrimaryDark">#101827</color> <!-- Deep Navy -->
+    <color name="colorAccent">#8768FF</color> <!-- Nova Violet -->
 
-    <color name="primaryGrayBackground">#2B2C30</color> <!--0f0f10 0E0E10 303135 2B2C30-->
-    <color name="primaryBlackBackground">#111111</color> <!--1C1C20 191a1f 19181E 202125 1C1C20-->
-    <color name="iconGrayBackground">#1C1C20</color> <!--141419 202125-->
-    <color name="boxItemBackground">#161616</color> <!-- 17171B 1B1B20-->
+    <color name="primaryGrayBackground">#101827</color> <!-- Deep Navy -->
+    <color name="primaryBlackBackground">#080B14</color> <!-- Midnight Navy -->
+    <color name="iconGrayBackground">#101827</color> <!-- Deep Navy -->
+    <color name="boxItemBackground">#182235</color> <!-- Elevated Surfaces -->
 
-    <color name="textColor">#e9eaee</color> <!--FFF-->
-    <color name="grayTextColor">#9ba0a4</color> <!-- 5e5f62-->
-    <color name="grayShimmer">#DCDCDC</color> <!-- 5e5f62-->
+    <color name="textColor">#F4F7FC</color> <!-- Soft White -->
+    <color name="grayTextColor">#9AA8BC</color> <!-- Cool Gray -->
+    <color name="grayShimmer">#1E2D44</color> <!-- Cosmic Shimmer -->
 
-    <color name="searchColorTransparent">#1AFFFFFF</color> <!--DADADA-->
+    <color name="searchColorTransparent">#1A35D6F2</color>
     <color name="transparent">#00000000</color>
 
-    <color name="white">#FFF</color>
-    <color name="black">#000</color>
-    <color name="gray_200">#EEEEEE</color>
-    <color name="gray_400">#BDBDBD</color>
+    <color name="white">#F4F7FC</color>
+    <color name="black">#080B14</color>
+    <color name="gray_200">#E2E8F0</color>
+    <color name="gray_400">#9AA8BC</color>
 
-    <color name="whiteText">#FFF</color>
-    <color name="blackText">#000</color>
+    <color name="whiteText">#F4F7FC</color>
+    <color name="blackText">#080B14</color>
 
-    <color name="progressBackgroundColor">#1AFFFFFF</color>
+    <color name="progressBackgroundColor">#26354D</color>
 
-    <color name="dubColorText">#121950</color> <!--3b65f5 f18c82 8294F1-->
-    <color name="amoledModeLight">#121213</color>
+    <color name="dubColorText">#080B14</color>
+    <color name="amoledModeLight">#101827</color>
 
-    <color name="dubColorBg">#3B65F5</color>
-    <color name="subColorText">#571711</color> <!--F53B66 FA3D79-->
-    <color name="subColorBg">#F53B66</color>
-    <color name="typeColorText">#BEC8FF</color>
-    <color name="typeColorBg">#3700B3</color>
+    <color name="dubColorBg">#35D6F2</color>
+    <color name="subColorText">#F4F7FC</color>
+    <color name="subColorBg">#8768FF</color>
+    <color name="typeColorText">#35D6F2</color>
+    <color name="typeColorBg">#182235</color>
 
-    <!--
-    <color name="ratingColor">#4C3115</color>
-    <color name="ratingColorBg">#FFA662</color>
-    -->
+    <color name="adultColor">#FF4757</color>
 
-    <color name="adultColor">#FF6F63</color> <!-- same as sub color -->
+    <color name="video_ripple">#4035D6F2</color>
+    <color name="video_button_ripple">#2635D6F2</color>
 
-    <color name="video_ripple">#80FFFFFF</color>
-    <color name="video_button_ripple">#32FFFFFF</color>
+    <color name="black_overlay">#B3080B14</color>
+    <color name="darkBarTransparent">#E6080B14</color>
+    <color name="skipOpTransparent">#CC101827</color>
+    <color name="darkBar">#080B14</color>
+    <color name="videoProgress">#8035D6F2</color>
 
-    <color name="black_overlay">#66000000</color>
-    <color name="darkBarTransparent">#C0121212</color>
-    <color name="skipOpTransparent">#4D121212</color>
-    <color name="darkBar">#121212</color>
-    <color name="videoProgress">#66B5B5B5</color> <!--66B5B5B5-->
-    <!--<color name="videoCache">#663D50FA</color>--> <!--66B5B5B5-->
-
-    <color name="iconColor">#9ba0a6</color>
+    <color name="iconColor">#9AA8BC</color>
 
     <!-- <color name="usedStorageColor">?attr/white</color>#fff-->
     <!-- <color name="freeStorageColor">?attr/grayTextColor</color> #676767-->
@@ -118,8 +113,8 @@
     <color name="colorPrimaryCoolBlue">#408cac</color>
     <color name="colorPrimaryLavender">#6F55AF</color>
 
-    <color name="colorTestPass">#48E484</color>
-    <color name="colorTestFail">#ea596e</color>
-    <color name="colorTestWarning">#FF9800</color>
-    <color name="playIconBackground">#B3000000</color>
+    <color name="colorTestPass">#2ED573</color>
+    <color name="colorTestFail">#FF4757</color>
+    <color name="colorTestWarning">#FFA502</color>
+    <color name="playIconBackground">#CC080B14</color>
 </resources>

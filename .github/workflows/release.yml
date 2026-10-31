@@ -1,0 +1,136 @@
+name: Stable Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Semantic version tag (e.g. v1.0.0)'
+        required: true
+        type: string
+
+concurrency:
+  group: "stable-release"
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Validate Release Tag
+      id: tag_check
+      run: |
+        TAG="${{ github.event.inputs.version || github.ref_name }}"
+        if [[ ! "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+          echo "::error::Invalid version tag '$TAG'. Expected format vMAJOR.MINOR.PATCH (e.g. v1.0.0)."
+          exit 1
+        fi
+        echo "release_tag=$TAG" >> "$GITHUB_OUTPUT"
+
+    - name: Set up JDK 17
+      uses: actions/setup-java@v4
+      with:
+        distribution: temurin
+        java-version: 17
+
+    - name: Grant execute permission for gradlew
+      run: chmod +x gradlew
+
+    - name: Setup Gradle
+      uses: gradle/actions/setup-gradle@v4
+
+    - name: Validate and Decode Release Keystore
+      env:
+        KS_B64: ${{ secrets.NOVASTREAM_KEYSTORE_BASE64 }}
+        KS_PWD: ${{ secrets.NOVASTREAM_KEYSTORE_PASSWORD }}
+        K_ALIAS: ${{ secrets.NOVASTREAM_KEY_ALIAS }}
+        K_PWD: ${{ secrets.NOVASTREAM_KEY_PASSWORD }}
+      run: |
+        if [ -z "$KS_B64" ] || [ -z "$KS_PWD" ] || [ -z "$K_ALIAS" ] || [ -z "$K_PWD" ]; then
+          echo "::error::Missing one or more required NovaStream release signing secrets."
+          exit 1
+        fi
+        mkdir -p "${RUNNER_TEMP}/keystore"
+        echo "$KS_B64" | base64 -d > "${RUNNER_TEMP}/keystore/novastream-release.jks"
+        keytool -list -v -keystore "${RUNNER_TEMP}/keystore/novastream-release.jks" -storepass "$KS_PWD" -alias "$K_ALIAS" > /dev/null
+
+    - name: Compile Stable Release APK
+      env:
+        NOVASTREAM_KEYSTORE_PATH: ${{ runner.temp }}/keystore/novastream-release.jks
+        NOVASTREAM_KEYSTORE_PASSWORD: ${{ secrets.NOVASTREAM_KEYSTORE_PASSWORD }}
+        NOVASTREAM_KEY_ALIAS: ${{ secrets.NOVASTREAM_KEY_ALIAS }}
+        NOVASTREAM_KEY_PASSWORD: ${{ secrets.NOVASTREAM_KEY_PASSWORD }}
+      run: |
+        ./gradlew assembleStableRelease
+
+    - name: Select, Verify, and Stage Stable APK
+      run: |
+        shopt -s nullglob
+        CANDIDATES=(app/build/outputs/apk/stable/release/*.apk)
+        COUNT=${#CANDIDATES[@]}
+
+        if [ "$COUNT" -eq 0 ]; then
+          echo "::error::Zero APK candidates found in app/build/outputs/apk/stable/release/!"
+          exit 1
+        fi
+
+        if [ "$COUNT" -gt 1 ]; then
+          echo "::error::Multiple APK candidates found ($COUNT). Expected exactly 1: ${CANDIDATES[*]}"
+          exit 1
+        fi
+
+        SRC_APK="${CANDIDATES[0]}"
+        echo "Selected single APK candidate: $SRC_APK"
+
+        BUILD_TOOLS_DIR=$(ls -d $ANDROID_HOME/build-tools/* | sort -V | tail -1)
+
+        # 1. Verify APK signature before staging
+        echo "--> Verifying APK signature with apksigner..."
+        "$BUILD_TOOLS_DIR/apksigner" verify --print-certs -v "$SRC_APK"
+
+        # 2. Verify Application ID and badging
+        echo "--> Verifying Application ID and Badging with aapt2..."
+        BADGING=$("$BUILD_TOOLS_DIR/aapt2" dump badging "$SRC_APK")
+        PACKAGE_LINE=$(echo "$BADGING" | grep "^package: name=")
+        echo "$PACKAGE_LINE"
+
+        if ! echo "$PACKAGE_LINE" | grep -q "package: name='com.rindou.novastream'"; then
+          echo "::error::Package ID mismatch! Expected com.rindou.novastream"
+          exit 1
+        fi
+
+        if echo "$PACKAGE_LINE" | grep -q "package: name='com.rindou.novastream.prerelease'"; then
+          echo "::error::Prerelease package detected in Stable build!"
+          exit 1
+        fi
+
+        # 3. Stage verified APK to dedicated distribution folder
+        TAG="${{ steps.tag_check.outputs.release_tag }}"
+        mkdir -p "${RUNNER_TEMP}/dist"
+        cp "$SRC_APK" "${RUNNER_TEMP}/dist/novastream-${TAG}.apk"
+        echo "Verified APK successfully staged to ${RUNNER_TEMP}/dist/novastream-${TAG}.apk"
+
+    - name: Create GitHub Release
+      uses: softprops/action-gh-release@v2
+      with:
+        token: "${{ secrets.GITHUB_TOKEN }}"
+        tag_name: "${{ steps.tag_check.outputs.release_tag }}"
+        name: "NovaStream ${{ steps.tag_check.outputs.release_tag }}"
+        prerelease: false
+        draft: false
+        generate_release_notes: true
+        files: |
+          ${{ runner.temp }}/dist/novastream-${{ steps.tag_check.outputs.release_tag }}.apk
+
+    - name: Cleanup Keystore and Staging
+      if: always()
+      run: |
+        rm -rf "${RUNNER_TEMP}/keystore"
+        rm -rf "${RUNNER_TEMP}/dist"

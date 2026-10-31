@@ -86,8 +86,8 @@
     </style>
 
     <style name="AmoledModeLight" parent="AmoledMode">
-        <item name="primaryGrayBackground">@color/amoledModeLight</item>
-        <item name="boxItemBackground">@color/amoledModeLight</item>
+        <item name="primaryGrayBackground">@color/primaryGrayBackground</item>
+        <item name="boxItemBackground">@color/boxItemBackground</item>
     </style>
 
     <style name="ChipFilled" parent="@style/Widget.Material3.Chip.Filter">
@@ -127,10 +127,10 @@
     </style>
 
     <style name="AmoledMode">
-        <item name="primaryGrayBackground">@color/black</item>
-        <item name="primaryBlackBackground">@color/black</item>
-        <item name="iconGrayBackground">@color/primaryBlackBackground</item>
-        <item name="boxItemBackground">@color/black</item>
+        <item name="primaryGrayBackground">@color/primaryGrayBackground</item>
+        <item name="primaryBlackBackground">@color/primaryBlackBackground</item>
+        <item name="iconGrayBackground">@color/iconGrayBackground</item>
+        <item name="boxItemBackground">@color/boxItemBackground</item>
         <item name="textColor">@color/textColor</item>
         <item name="grayTextColor">@color/grayTextColor</item>
         <item name="white">@color/white</item>
@@ -712,10 +712,10 @@
     </style>
 
     <style name="WhiteButton" parent="NiceButton">
-        <item name="strokeColor">?attr/iconGrayBackground</item>
-        <item name="backgroundTint">?attr/textColor</item>
-        <item name="iconTint">?attr/iconGrayBackground</item>
-        <item name="android:textColor">?attr/iconGrayBackground</item>
+        <item name="strokeColor">?attr/colorPrimary</item>
+        <item name="backgroundTint">?attr/colorPrimary</item>
+        <item name="iconTint">?attr/primaryBlackBackground</item>
+        <item name="android:textColor">?attr/primaryBlackBackground</item>
         <item name="rippleColor">?attr/primaryBlackBackground</item>
     </style>
     <!-- This is so shit, because android has no native way to either changing the layout (android:layout) or changing the layout_height for no reason.
@@ -776,11 +776,12 @@
     </style>
 
     <style name="BlackButton" parent="NiceButton">
-        <item name="strokeColor">?attr/textColor</item>
-        <item name="backgroundTint">?attr/iconGrayBackground</item>
+        <item name="strokeColor">#26354D</item>
+        <item name="strokeWidth">1dp</item>
+        <item name="backgroundTint">?attr/boxItemBackground</item>
         <item name="iconTint">?attr/textColor</item>
         <item name="android:textColor">?attr/textColor</item>
-        <item name="rippleColor">@color/black_button_ripple</item>
+        <item name="rippleColor">@color/video_button_ripple</item>
     </style>
 
     <style name="SmallBlackButton" parent="BlackButton">
@@ -1075,7 +1076,7 @@
     <style name="CircularProgress">
         <item name="trackThickness">@dimen/circular_progress_thickness</item>
         <item name="android:layout_gravity">center</item>
-        <item name="indicatorColor">@color/white</item>
+        <item name="indicatorColor">?attr/colorPrimary</item>
         <item name="indicatorTrackGapSize">0dp</item>
         <item name="trackColor">@color/white_attr_20</item>
     </style>
